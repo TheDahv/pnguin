@@ -190,6 +190,17 @@ func (p *Parser) Parse() error {
 	return nil
 }
 
+// WalkChunks iterates over the parsed chunks in the file. Each is handed to the
+// iteratee function, which can return true or false to indicate whether
+// iteration should continue.
+func (p *Parser) WalkChunks(fn func(ch Chunk) bool) {
+	for _, ch := range p.data {
+		if cont := fn(ch); !cont {
+			break
+		}
+	}
+}
+
 // Close closes the internal file
 func (p *Parser) Close() error {
 	return p.rc.Close()
