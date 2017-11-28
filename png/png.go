@@ -1,4 +1,4 @@
-// package png implements a parser for PNG files and operations on those files
+// Package png implements a parser for PNG files and operations on those files
 // according to https://en.wikipedia.org/wiki/Portable_Network_Graphics
 package png
 
@@ -22,50 +22,124 @@ var (
 		'\x1a',
 		'\x0a',
 	}
-	ctHdr = []byte{'I', 'H', 'D', 'R'}
+	ctHdr  = []byte{'I', 'H', 'D', 'R'}
+	ctPlte = []byte{'P', 'L', 'T', 'E'}
+	ctDat  = []byte{'I', 'D', 'A', 'T'}
+	ctEnd  = []byte{'I', 'E', 'N', 'D'}
+	ctBkgd = []byte{'b', 'K', 'G', 'D'}
+	ctChrm = []byte{'c', 'H', 'R', 'M'}
+	ctDSig = []byte{'d', 'S', 'I', 'G'}
+	ctExif = []byte{'e', 'X', 'I', 'f'}
+	ctGama = []byte{'g', 'A', 'M', 'A'}
+	ctHist = []byte{'h', 'I', 'S', 'T'}
+	ctIccp = []byte{'i', 'C', 'C', 'P'}
+	ctItxt = []byte{'i', 'T', 'X', 't'}
+	ctPhys = []byte{'p', 'H', 'Y', 's'}
+	ctSbit = []byte{'s', 'B', 'I', 'T'}
+	ctSplt = []byte{'s', 'P', 'L', 'T'}
+	ctSrgb = []byte{'s', 'R', 'G', 'B'}
+	ctSter = []byte{'s', 'T', 'E', 'R'}
+	ctText = []byte{'t', 'E', 'X', 't'}
+	ctTime = []byte{'t', 'I', 'M', 'E'}
+	ctTrns = []byte{'t', 'R', 'N', 'S'}
+	ctZtxt = []byte{'z', 'T', 'X', 't'}
 )
 
 type chunkType int
 
+// Types of chunks that comprise the image and convey information about the
+// content.
+// https://en.wikipedia.org/wiki/Portable_Network_Graphics#.22Chunks.22_within_the_file
 const (
-	chunkTypeUnknown chunkType = iota
+	ChunkTypeUnknown chunkType = iota
 
 	// Critical types
-	chunkTypeHeader
-	chunkTypePalette
-	chunkTypeData
-	chunkTypeEnd
+	ChunkTypeHeader
+	ChunkTypePalette
+	ChunkTypeData
+	ChunkTypeEnd
 
 	// Ancillary types
-	chunkTypeBkgdColor
-	chunkTypeChromaticity
-	chunkTypeDigiSignal
-	chunkTypeExif
-	chunkTypeGamma
-	chunkTypeHistogram
-	chunkTypeICC
-	chunkTypeTxtUTF8
-	chunkTypePxSize
-	chunkTypeSigBits
-	chunkTypeSugPalette
-	chunkTypeRGB
-	chunkTypeStereo
-	chunkTypeTxtISO8859
-	chunkTypeTimeChanged
-	chunkTypeTransparency
-	chunkTypeTxtCompressed
+	ChunkTypeBkgdColor
+	ChunkTypeChromaticity
+	ChunkTypeDigiSignal
+	ChunkTypeExif
+	ChunkTypeGamma
+	ChunkTypeHistogram
+	ChunkTypeICC
+	ChunkTypeTxtUTF8
+	ChunkTypePxSize
+	ChunkTypeSigBits
+	ChunkTypeSugPalette
+	ChunkTypeRGB
+	ChunkTypeStereo
+	ChunkTypeTxtISO8859
+	ChunkTypeTimeChanged
+	ChunkTypeTransparency
+	ChunkTypeTxtCompressed
 )
+
+// String converts chunk types to a human-friendly representation
+func (ct chunkType) String() string {
+	switch ct {
+	case ChunkTypeHeader:
+		return "IHDR (Header)"
+	case ChunkTypePalette:
+		return "PLTE (Pallette)"
+	case ChunkTypeData:
+		return "IDAT (Data)"
+	case ChunkTypeEnd:
+		return "IEND (Image End)"
+	case ChunkTypeBkgdColor:
+		return "bKGD (Default Background Color)"
+	case ChunkTypeChromaticity:
+		return "cHRM (Chromaticity)"
+	case ChunkTypeDigiSignal:
+		return "dSIG (Digital Signatures)"
+	case ChunkTypeExif:
+		return "eXIf (Exif)"
+	case ChunkTypeGamma:
+		return "gAMA (Gamma)"
+	case ChunkTypeHistogram:
+		return "hIST (Color Histogram)"
+	case ChunkTypeICC:
+		return "iCCP (ICC Color Profile)"
+	case ChunkTypeTxtUTF8:
+		return "iTXt (UTF-8 Keyword Text)"
+	case ChunkTypePxSize:
+		return "pHYs (Intended Pixel Size)"
+	case ChunkTypeSigBits:
+		return "sBIT (Color-Accuracy)"
+	case ChunkTypeSugPalette:
+		return "sPLT (Suggested Palette)"
+	case ChunkTypeRGB:
+		return "sRGB (sRGB Color Space)"
+	case ChunkTypeStereo:
+		return "sTER (Stereo-Image Indicator)"
+	case ChunkTypeTxtISO8859:
+		return "tEXt (ISO/IEC 885901 Text)"
+	case ChunkTypeTimeChanged:
+		return "tIME (Last Changed Time)"
+	case ChunkTypeTransparency:
+		return "tRNS (Transparency)"
+	case ChunkTypeTxtCompressed:
+		return "zTXt (Compressed Text)"
+	default:
+		return "Unknown"
+	}
+}
 
 // Parser knows how to parse and operate on PNG files
 type Parser struct {
 	Path string
 	rc   io.ReadCloser
 	br   *bufio.Reader
-	data []chunk
+	data []Chunk
 }
 
+// Chunk holds information and data in an image.
 // TODO look at field byte padding for this
-type chunk struct {
+type Chunk struct {
 	Length []byte
 	CRC    []byte
 	Data   []byte
@@ -124,7 +198,7 @@ func (p *Parser) Close() error {
 // PrintHeader outputs header chunks to stdout
 func (p *Parser) PrintHeader() {
 	for _, ch := range p.data {
-		if ch.Type == chunkTypeHeader {
+		if ch.Type == ChunkTypeHeader {
 			fmt.Printf("%s Header\n", p.Path)
 			hdr, _ := parseHeader(ch.Data) // TODO handle
 			fmt.Printf("Width\t%d\n", hdr.Width)
@@ -140,8 +214,8 @@ func (p *Parser) PrintHeader() {
 }
 
 // Chunks returns a slice of chunks parsed from the PNG
-func (p *Parser) chunks() ([]chunk, error) {
-	var chunks []chunk
+func (p *Parser) chunks() ([]Chunk, error) {
+	var chunks []Chunk
 
 	b, err := p.IsPNG()
 	if err != nil {
@@ -151,17 +225,13 @@ func (p *Parser) chunks() ([]chunk, error) {
 		return chunks, errors.New("input not a PNG")
 	}
 
-	var fileHdr []byte
-	for i := 0; i < 8; i++ {
-		b, err := p.br.ReadByte()
-		if err != nil {
-			return chunks, fmt.Errorf("unable to read header: %v", err)
-		}
-		fileHdr = append(fileHdr, b)
+	fileHdr := make([]byte, 8)
+	if c, err := io.ReadFull(p.br, fileHdr); err != nil || c != 8 {
+		return chunks, fmt.Errorf("unable to read header: %v", err)
 	}
 
 	for {
-		c := chunk{
+		c := Chunk{
 			Length: make([]byte, 4),
 			CRC:    make([]byte, 4),
 		}
@@ -219,10 +289,70 @@ func (p *Parser) chunks() ([]chunk, error) {
 
 func getChunkType(ct []byte) chunkType {
 	if bytes.Compare(ct[:], ctHdr) == 0 {
-		return chunkTypeHeader
+		return ChunkTypeHeader
+	}
+	if bytes.Compare(ct[:], ctPlte) == 0 {
+		return ChunkTypePalette
+	}
+	if bytes.Compare(ct[:], ctDat) == 0 {
+		return ChunkTypeData
+	}
+	if bytes.Compare(ct[:], ctEnd) == 0 {
+		return ChunkTypeEnd
+	}
+	if bytes.Compare(ct[:], ctBkgd) == 0 {
+		return ChunkTypeBkgdColor
+	}
+	if bytes.Compare(ct[:], ctChrm) == 0 {
+		return ChunkTypeChromaticity
+	}
+	if bytes.Compare(ct[:], ctDSig) == 0 {
+		return ChunkTypeDigiSignal
+	}
+	if bytes.Compare(ct[:], ctExif) == 0 {
+		return ChunkTypeExif
+	}
+	if bytes.Compare(ct[:], ctGama) == 0 {
+		return ChunkTypeGamma
+	}
+	if bytes.Compare(ct[:], ctHist) == 0 {
+		return ChunkTypeHistogram
+	}
+	if bytes.Compare(ct[:], ctIccp) == 0 {
+		return ChunkTypeICC
+	}
+	if bytes.Compare(ct[:], ctItxt) == 0 {
+		return ChunkTypeTxtUTF8
+	}
+	if bytes.Compare(ct[:], ctPhys) == 0 {
+		return ChunkTypePxSize
+	}
+	if bytes.Compare(ct[:], ctSbit) == 0 {
+		return ChunkTypeSigBits
+	}
+	if bytes.Compare(ct[:], ctSplt) == 0 {
+		return ChunkTypeSugPalette
+	}
+	if bytes.Compare(ct[:], ctSrgb) == 0 {
+		return ChunkTypeRGB
+	}
+	if bytes.Compare(ct[:], ctSter) == 0 {
+		return ChunkTypeStereo
+	}
+	if bytes.Compare(ct[:], ctText) == 0 {
+		return ChunkTypeTxtISO8859
+	}
+	if bytes.Compare(ct[:], ctTime) == 0 {
+		return ChunkTypeTimeChanged
+	}
+	if bytes.Compare(ct[:], ctTrns) == 0 {
+		return ChunkTypeTransparency
+	}
+	if bytes.Compare(ct[:], ctZtxt) == 0 {
+		return ChunkTypeTxtCompressed
 	}
 
-	return chunkTypeUnknown
+	return ChunkTypeUnknown
 }
 
 func parseHeader(data []byte) (headerChunk, error) {
