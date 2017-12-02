@@ -225,6 +225,64 @@ func (p *Parser) PrintHeader() {
 	}
 }
 
+// StripTags returns a version of the input file with all non-critical chunks
+// and metadata removed.
+func (p *Parser) StripTags() io.Reader {
+	r, w := io.Pipe()
+
+	go func() {
+		if _, err := w.Write(pngHeader); err != nil {
+			w.CloseWithError(fmt.Errorf("unable to write PNG header: %v", err))
+			return
+		}
+
+		var passThrough = map[chunkType]bool{
+			ChunkTypeHeader:  true,
+			ChunkTypePalette: true,
+			ChunkTypeData:    true,
+			ChunkTypeEnd:     true,
+		}
+
+		var err error
+		p.WalkChunks(func(ch Chunk) bool {
+			if _, ok := passThrough[ch.Type]; ok {
+				var typeBytes []byte
+				switch ch.Type {
+				case ChunkTypeHeader:
+					typeBytes = ctHdr
+				case ChunkTypePalette:
+					typeBytes = ctPlte
+				case ChunkTypeData:
+					typeBytes = ctDat
+				case ChunkTypeEnd:
+					typeBytes = ctEnd
+				}
+				if _, e := w.Write(ch.Length[:]); e != nil {
+					err = fmt.Errorf("unable to write chunk length: %v", e)
+					return false
+				}
+				if _, e := w.Write(typeBytes); e != nil {
+					err = fmt.Errorf("unable to write chunk type: %v", e)
+					return false
+				}
+				if _, e := w.Write(ch.Data[:]); e != nil {
+					err = fmt.Errorf("unable to write chunk data: %v", e)
+					return false
+				}
+				if _, e := w.Write(ch.CRC[:]); e != nil {
+					err = fmt.Errorf("unable to write chunk CRC: %v", e)
+					return false
+				}
+			}
+			return true
+		})
+
+		w.CloseWithError(err)
+	}()
+
+	return r
+}
+
 // Chunks returns a slice of chunks parsed from the PNG
 func (p *Parser) chunks() ([]Chunk, error) {
 	var chunks []Chunk

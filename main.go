@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"path"
+	"strings"
 
 	"gitlab.com/thedahv/pnguin/png"
 )
@@ -19,7 +22,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) == 0 {
-		parsers = append(parsers, png.New("Unknown Image", os.Stdin))
+		parsers = append(parsers, png.New("stdin", os.Stdin))
 	} else {
 		for _, path := range args {
 			f, err := os.Open(path)
@@ -38,7 +41,7 @@ func main() {
 		}
 	}()
 
-	for _, p := range parsers {
+	for i, p := range parsers {
 		if b, err := p.IsPNG(); !b || err != nil {
 			fmt.Fprintf(os.Stderr, "%s is not a PNG\n", p.Path)
 			continue
@@ -60,6 +63,45 @@ func main() {
 				}
 				return true
 			})
+		}
+
+		if *cleanFile {
+			var destPath string
+
+			if p.Path == "stdin" {
+				if wd, err := os.Getwd(); err != nil {
+					fmt.Fprintf(os.Stderr, "unable to determine current directory: %v",
+						err)
+					os.Exit(1)
+				} else {
+					destPath = path.Join(wd, fmt.Sprintf("stdin-%d.png", i))
+				}
+			} else {
+				name := path.Base(p.Path)
+				base := path.Dir(p.Path)
+				parts := strings.Split(name, ".")
+				destPath = path.Join(
+					base,
+					strings.Join(parts[:len(parts)-1], ".")+"-cleaned"+".png",
+				)
+
+			}
+
+			dest, err :=
+				os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY, 0644)
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr,
+					"unable to open file cleaning destination for %s: %v\n", p.Path, err)
+				os.Exit(1)
+			}
+
+			if _, err := io.Copy(dest, p.StripTags()); err != nil && err != io.EOF {
+				fmt.Fprintf(os.Stderr, "unable to strip tags for %s: %v", p.Path, err)
+				os.Exit(1)
+			}
+
+			dest.Close()
 		}
 	}
 }
