@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
 var (
@@ -212,14 +213,14 @@ func (p *Parser) PrintHeader() {
 		if ch.Type == ChunkTypeHeader {
 			fmt.Printf("%s Header\n", p.Path)
 			hdr, _ := parseHeader(ch.Data) // TODO handle
-			fmt.Printf("Width\t%d\n", hdr.Width)
-			fmt.Printf("Height\t%d\n", hdr.Height)
-			fmt.Printf("Bit Depth\t%d\n", hdr.BitDepth)
-			fmt.Printf("Color Type\t%d\n", hdr.ColorType)
-			fmt.Printf("Compression Method\t%d\n", hdr.CompressionMethod)
-			fmt.Printf("Filter Method\t%d\n", hdr.BitDepth)
-			fmt.Printf("Interlace Method\t%d\n", hdr.InterlaceMethod)
-			fmt.Println()
+			fmt.Fprintf(os.Stdout, "Width\t%d\n", hdr.Width)
+			fmt.Fprintf(os.Stdout, "Height\t%d\n", hdr.Height)
+			fmt.Fprintf(os.Stdout, "Bit Depth\t%d\n", hdr.BitDepth)
+			fmt.Fprintf(os.Stdout, "Color Type\t%d\n", hdr.ColorType)
+			fmt.Fprintf(os.Stdout, "Compression Method\t%d\n", hdr.CompressionMethod)
+			fmt.Fprintf(os.Stdout, "Filter Method\t%d\n", hdr.BitDepth)
+			fmt.Fprintf(os.Stdout, "Interlace Method\t%d\n", hdr.InterlaceMethod)
+			fmt.Fprintln(os.Stdout)
 		}
 	}
 }

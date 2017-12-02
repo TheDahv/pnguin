@@ -11,7 +11,9 @@ import (
 func main() {
 	var parsers []*png.Parser
 
-	showTags := flag.Bool("tags", false, "show tags")
+	showTags := flag.Bool("tags", false, "Print non-data tags")
+	cleanFile := flag.Bool("clean", false,
+		"Write images stripped of text tags")
 	flag.Parse()
 
 	args := flag.Args()
@@ -48,13 +50,13 @@ func main() {
 		}
 
 		if *showTags {
-			fmt.Printf("%s tags:\n", p.Path)
+			fmt.Fprintf(os.Stdout, "%s tags:\n", p.Path)
 			p.WalkChunks(func(ch png.Chunk) bool {
 				if !(ch.Type == png.ChunkTypeData || ch.Type == png.ChunkTypeHeader || ch.Type == png.ChunkTypeEnd) {
-					fmt.Printf("  %s\n", ch.Type)
+					fmt.Fprintf(os.Stdout, "  %s\n", ch.Type)
 				}
 				if ch.Type == png.ChunkTypeTxtUTF8 || ch.Type == png.ChunkTypeTxtISO8859 {
-					fmt.Printf("    %s\n", ch.Data)
+					fmt.Fprintf(os.Stdout, "   %s\n", ch.Data)
 				}
 				return true
 			})
