@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/thedahv/pngaling/png"
+	"gitlab.com/thedahv/pnguin/png"
 )
 
 func main() {
