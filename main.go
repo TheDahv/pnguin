@@ -17,6 +17,7 @@ func main() {
 	showTags := flag.Bool("tags", false, "Print non-data tags")
 	cleanFile := flag.Bool("clean", false,
 		"Write images stripped of text tags")
+	flag.Usage = Usage
 	flag.Parse()
 
 	args := flag.Args()
@@ -104,4 +105,11 @@ func main() {
 			dest.Close()
 		}
 	}
+}
+
+// Usage adds a bit of customization to the standard flag package Usage helper
+func Usage() {
+	fmt.Fprintf(os.Stderr, "usage: pnguin [imgpath ...]\n")
+	flag.PrintDefaults()
+	os.Exit(2)
 }

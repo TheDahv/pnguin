@@ -13,37 +13,28 @@ import (
 )
 
 var (
-	pngHeader = []byte{
-		'\x89',
-		'\x50',
-		'\x4e',
-		'\x47',
-		'\x0d',
-		'\x0a',
-		'\x1a',
-		'\x0a',
-	}
-	ctHdr  = []byte{'I', 'H', 'D', 'R'}
-	ctPlte = []byte{'P', 'L', 'T', 'E'}
-	ctDat  = []byte{'I', 'D', 'A', 'T'}
-	ctEnd  = []byte{'I', 'E', 'N', 'D'}
-	ctBkgd = []byte{'b', 'K', 'G', 'D'}
-	ctChrm = []byte{'c', 'H', 'R', 'M'}
-	ctDSig = []byte{'d', 'S', 'I', 'G'}
-	ctExif = []byte{'e', 'X', 'I', 'f'}
-	ctGama = []byte{'g', 'A', 'M', 'A'}
-	ctHist = []byte{'h', 'I', 'S', 'T'}
-	ctIccp = []byte{'i', 'C', 'C', 'P'}
-	ctItxt = []byte{'i', 'T', 'X', 't'}
-	ctPhys = []byte{'p', 'H', 'Y', 's'}
-	ctSbit = []byte{'s', 'B', 'I', 'T'}
-	ctSplt = []byte{'s', 'P', 'L', 'T'}
-	ctSrgb = []byte{'s', 'R', 'G', 'B'}
-	ctSter = []byte{'s', 'T', 'E', 'R'}
-	ctText = []byte{'t', 'E', 'X', 't'}
-	ctTime = []byte{'t', 'I', 'M', 'E'}
-	ctTrns = []byte{'t', 'R', 'N', 'S'}
-	ctZtxt = []byte{'z', 'T', 'X', 't'}
+	pngHeader = []byte("\x89\x50\x4e\x47\x0d\x0a\x1a\x0a")
+	ctHdr     = []byte{'I', 'H', 'D', 'R'}
+	ctPlte    = []byte{'P', 'L', 'T', 'E'}
+	ctDat     = []byte{'I', 'D', 'A', 'T'}
+	ctEnd     = []byte{'I', 'E', 'N', 'D'}
+	ctBkgd    = []byte{'b', 'K', 'G', 'D'}
+	ctChrm    = []byte{'c', 'H', 'R', 'M'}
+	ctDSig    = []byte{'d', 'S', 'I', 'G'}
+	ctExif    = []byte{'e', 'X', 'I', 'f'}
+	ctGama    = []byte{'g', 'A', 'M', 'A'}
+	ctHist    = []byte{'h', 'I', 'S', 'T'}
+	ctIccp    = []byte{'i', 'C', 'C', 'P'}
+	ctItxt    = []byte{'i', 'T', 'X', 't'}
+	ctPhys    = []byte{'p', 'H', 'Y', 's'}
+	ctSbit    = []byte{'s', 'B', 'I', 'T'}
+	ctSplt    = []byte{'s', 'P', 'L', 'T'}
+	ctSrgb    = []byte{'s', 'R', 'G', 'B'}
+	ctSter    = []byte{'s', 'T', 'E', 'R'}
+	ctText    = []byte{'t', 'E', 'X', 't'}
+	ctTime    = []byte{'t', 'I', 'M', 'E'}
+	ctTrns    = []byte{'t', 'R', 'N', 'S'}
+	ctZtxt    = []byte{'z', 'T', 'X', 't'}
 )
 
 type chunkType uint32
@@ -146,7 +137,9 @@ type Chunk struct {
 	Data   []byte
 }
 
-// it contains (in this order) the image's width, height, bit depth, color type,
+// headerChunk gives us a more specific breakdown of the IHDR chunk since it
+// contains some interesting information we may want about the image.
+// It contains (in this order) the image's width, height, bit depth, color type,
 // compression method, filter method, and interlace method (13 data bytes total)
 type headerChunk struct {
 	Width             uint32
@@ -159,16 +152,18 @@ type headerChunk struct {
 }
 
 // New returns a new parser on the given input
-func New(path string, rc io.ReadCloser) *Parser {
+func New(imgName string, rc io.ReadCloser) *Parser {
 	return &Parser{
-		Path: path,
+		Path: imgName,
 		rc:   rc,
 		br:   bufio.NewReader(rc),
 	}
 }
 
 // IsPNG checks for the required headers in the input. It does not advance the
-// reader.
+// reader. Use this if you want to test a file *before* parsing. It won't work
+// correctly if the file has already been parsed and the internal reader
+// exhausted.
 func (p *Parser) IsPNG() (bool, error) {
 	b, err := p.br.Peek(8)
 
@@ -179,7 +174,10 @@ func (p *Parser) IsPNG() (bool, error) {
 	return bytes.Compare(pngHeader, b) == 0, nil
 }
 
-// Parse reads the chunks from the input
+// Parse reads the chunks from the input and makes them available via the
+// Chunks() method. Note, it also consumes the entire reader for the file so
+// reader operations won't work or the reader must be reset *after* calling
+// this.
 func (p *Parser) Parse() error {
 	chunks, err := p.chunks()
 	if err != nil {
@@ -421,20 +419,20 @@ func getChunkType(ct []byte) chunkType {
 	return ChunkTypeUnknown
 }
 
-func parseHeader(data []byte) (headerChunk, error) {
+func parseHeader(chunk []byte) (headerChunk, error) {
 	var hdr headerChunk
-	if l := len(data); l != 13 {
+	if l := len(chunk); l != 13 {
 		return hdr, fmt.Errorf("got %d bytes for header chunk, expected %d",
 			l, 13)
 	}
 
-	hdr.Width = binary.BigEndian.Uint32(data[0:4])
-	hdr.Height = binary.BigEndian.Uint32(data[4:8])
-	hdr.BitDepth = data[8]
-	hdr.ColorType = data[9]
-	hdr.CompressionMethod = data[10]
-	hdr.FilterMethod = data[11]
-	hdr.InterlaceMethod = data[12]
+	hdr.Width = binary.BigEndian.Uint32(chunk[0:4])
+	hdr.Height = binary.BigEndian.Uint32(chunk[4:8])
+	hdr.BitDepth = chunk[8]
+	hdr.ColorType = chunk[9]
+	hdr.CompressionMethod = chunk[10]
+	hdr.FilterMethod = chunk[11]
+	hdr.InterlaceMethod = chunk[12]
 
 	return hdr, nil
 }
