@@ -46,7 +46,7 @@ var (
 	ctZtxt = []byte{'z', 'T', 'X', 't'}
 )
 
-type chunkType int
+type chunkType uint32
 
 // Types of chunks that comprise the image and convey information about the
 // content.
@@ -139,12 +139,11 @@ type Parser struct {
 }
 
 // Chunk holds information and data in an image.
-// TODO look at field byte padding for this
 type Chunk struct {
-	Length []byte
-	CRC    []byte
-	Data   []byte
+	Length [4]byte
+	CRC    [4]byte
 	Type   chunkType
+	Data   []byte
 }
 
 // it contains (in this order) the image's width, height, bit depth, color type,
@@ -301,10 +300,7 @@ func (p *Parser) chunks() ([]Chunk, error) {
 	}
 
 	for {
-		c := Chunk{
-			Length: make([]byte, 4),
-			CRC:    make([]byte, 4),
-		}
+		c := Chunk{}
 
 		// Read LENGTH
 		read, err := io.ReadFull(p.br, c.Length[:])
